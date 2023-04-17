@@ -4,21 +4,36 @@
 #Tras llenarlo va a la oficia y se pone en la cola. La caja es única. 3 minutos
 #Tras pagar retira el coche dejando libre el surtidor.
 
+'''Modelar el problema con los objetos apropiados indicando los estados en que puede estar cada elemento.
+Modelar los coches como Threads que genere el programa principal. A efectos del ejercicio se generan 50 coches.
+Para un T de 15 minutos y N un surtidor.
+Calcular el tiempo medio que tarda un coche desde que llega a la gasolinera hasta que se va.'''
+
 import random
 import simpy
-import time
+
 
 #Variables globales
 T = 15 #Tiempo de llegada de los coches
 N = 1 #Número de surtidores
-tiempo = 0 #Tiempo de simulación
+
 
 class Cola:
-    coche = 0
     def __init__(self, env, surtidores, caja):
         self.env = env
         self.surtidores = simpy.resource(env, surtidores)
         self.caja = caja
+        self.tiempo = simpy.Resource(env, 1)
+
+        
+    def coche(self, coche):
+        print("El coche %s ha llegado a la gasolinera" % coche)
+        with self.surtidores.request() as surtidor:
+            yield surtidor
+            print("El coche %s ha llegado al surtidor" % coche)
+            yield self.env.process(self.llenar(coche))
+            yield self.env.process(self.pagar(coche))
+            yield self.env.process(self.retirar(coche))
 
     def llenar(self, coche):
         yield self.env.timeout(random.randint(5,10))
@@ -31,3 +46,17 @@ class Cola:
     def retirar(self, coche):
         yield self.env.timeout(2)
         print("El coche %s ha retirado el coche" % coche)
+    
+    def coche_llega(self, coche):
+        yield self.env.timeout(random.randint(1,T))
+        self.tiempo.process(self.coche(coche))
+    
+    def run(self):
+        for i in range(50):
+            self.env.process(self.coche_llega(i))
+    
+
+def main():
+    env = simpy.Environment()
+    cola = Cola(env, 1, 1)
+    env.process(cola.run())
